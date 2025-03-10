@@ -133,14 +133,14 @@ bool DxApplication::ProcessMessage(mini::WindowMessage& msg)
 		{
 			// Adjust camera tilt angle (RX)
 			m_cameraAngle += XMConvertToRadians(dy);
-			m_cameraAngle = max(-XM_PI, min(XM_PI, m_cameraAngle)); // Clamp between [-π, π]
+			m_cameraAngle = max(-XM_PI, min(XM_PI, m_cameraAngle)); 
 		}
 
 		if (m_rightMouseDown)
 		{
 			// Adjust camera distance (TZ)
 			m_cameraDistance += dy * 0.1f; // Scale the movement speed
-			m_cameraDistance = max(0.0f, min(50.0f, m_cameraDistance)); // Clamp between [0, 50]
+			m_cameraDistance = max(0.0f, min(50.0f, m_cameraDistance)); 
 		}
 
 		m_lastMousePos.x = x;
