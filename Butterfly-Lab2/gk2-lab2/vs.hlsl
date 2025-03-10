@@ -33,7 +33,6 @@ PSInput main(VSInput i)
 	float4 pos = mul(worldMatrix, float4(i.pos, 1.0f));
     o.worldPos = pos.xyz; // Store world position
 	
-
 	pos = mul(viewMatrix, pos);
 	o.pos = mul(projMatrix, pos);
 

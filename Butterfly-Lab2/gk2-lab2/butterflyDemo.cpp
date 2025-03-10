@@ -138,7 +138,30 @@ void ButterflyDemo::CreateDodecahadronMtx()
 //Compute dodecahedronMtx and mirrorMtx
 {
 	//TODO : 1.01. calculate m_dodecahedronMtx matrices
+	std::vector<DirectX::XMMATRIX> matrices(12);
 
+	matrices[0] = XMMatrixIdentity() *
+		XMMatrixRotationX(DirectX::XM_PIDIV2) *
+		XMMatrixTranslation(0, -DODECAHEDRON_H / 2, 0) * 
+		XMMatrixScaling(2, 2, 2);
+
+	matrices[1] = matrices[0] *
+		XMMatrixRotationY(DirectX::XM_PI) *
+		XMMatrixRotationZ(DODECAHEDRON_A - DirectX::XM_PI);
+
+	for (int i = 2; i < 6; i++) {
+		matrices[i] = matrices[i - 1] *
+			XMMatrixRotationY(DirectX::XM_PI * 2 / 5.f);
+	}
+
+	for (int i = 6; i < 12; i++) {
+		matrices[i] = matrices[i - 6] *
+			XMMatrixRotationZ(DirectX::XM_PI);
+	}
+
+	for (int i = 0; i < 12; i++) {
+		XMStoreFloat4x4(&m_dodecahedronMtx[i], matrices[i]);
+	}
 
 	//TODO : 1.12. calculate m_mirrorMtx matrices
 }
@@ -276,6 +299,10 @@ void ButterflyDemo::DrawDodecahedron(bool colors)
 //Draw dodecahedron. If color is true, use render faces with corresponding colors. Otherwise render using white color
 {
 	//TODO : 1.02. Draw all dodecahedron sides with colors - ignore function parameter for now
+	for (int i = 0; i < 12; i++) {
+		UpdateBuffer(m_cbWorld, m_dodecahedronMtx[i]);
+		m_pentagon.Render(m_device.context());
+	}
 
 	//TODO : 1.14. Modify function so if colors parameter is set to false, all faces are drawn white instead
 	
