@@ -27,6 +27,7 @@ DxApplication::DxApplication(HINSTANCE hInstance)
 	m_pixelShader = m_device.CreatePixelShader(psBytes);
 
 	// matrices inicialization
+	XMStoreFloat4x4(&m_modelMtx2, XMMatrixIdentity());
 	XMStoreFloat4x4(&m_modelMtx, XMMatrixIdentity());
 	XMStoreFloat4x4(&m_viewMtx,
 		XMMatrixRotationX(XMConvertToRadians(-30)) *
@@ -68,6 +69,14 @@ int DxApplication::MainLoop()
 	//doesn't find any messages, msg is zeroed out to make sure loop condition
 	//isn't reading unitialized values.
 	ZeroMemory(&msg, sizeof msg);
+
+	LARGE_INTEGER frequency;
+	QueryPerformanceFrequency(&frequency); // Pobranie częstotliwości licznika
+
+	LARGE_INTEGER lastTime, currentTime;
+	QueryPerformanceCounter(&lastTime); // Pobranie początkowego czasu
+
+	float deltaTime = 0.0f;
 	do
 	{
 		if (PeekMessage(&msg, nullptr, 0,0, PM_REMOVE))
@@ -77,6 +86,11 @@ int DxApplication::MainLoop()
 		}
 		else
 		{
+			// Obliczanie deltaTime
+			QueryPerformanceCounter(&currentTime);
+			deltaTime = static_cast<float>(currentTime.QuadPart - lastTime.QuadPart) / frequency.QuadPart;
+			lastTime = currentTime;
+			Tick(deltaTime);
 			Update();
 			Render();
 			m_device.swapChain()->Present(0, 0);
@@ -85,19 +99,85 @@ int DxApplication::MainLoop()
 	return static_cast<int>(msg.wParam);
 }
 
+bool DxApplication::ProcessMessage(mini::WindowMessage& msg)
+{
+	switch (msg.message)
+	{
+	case WM_LBUTTONDOWN:
+		m_leftMouseDown = true;
+		m_lastMousePos.x = LOWORD(msg.lParam);
+		m_lastMousePos.y = HIWORD(msg.lParam);
+		return true;
+
+	case WM_RBUTTONDOWN:
+		m_rightMouseDown = true;
+		m_lastMousePos.x = LOWORD(msg.lParam);
+		m_lastMousePos.y = HIWORD(msg.lParam);
+		return true;
+
+	case WM_LBUTTONUP:
+		m_leftMouseDown = false;
+		return true;
+
+	case WM_RBUTTONUP:
+		m_rightMouseDown = false;
+		return true;
+
+	case WM_MOUSEMOVE:
+		int x = LOWORD(msg.lParam);
+		int y = HIWORD(msg.lParam);
+		int dx = x - m_lastMousePos.x;
+		int dy = y - m_lastMousePos.y;
+
+		if (m_leftMouseDown)
+		{
+			// Adjust camera tilt angle (RX)
+			m_cameraAngle += XMConvertToRadians(dy);
+			m_cameraAngle = max(-XM_PI, min(XM_PI, m_cameraAngle)); // Clamp between [-π, π]
+		}
+
+		if (m_rightMouseDown)
+		{
+			// Adjust camera distance (TZ)
+			m_cameraDistance += dy * 0.1f; // Scale the movement speed
+			m_cameraDistance = max(0.0f, min(50.0f, m_cameraDistance)); // Clamp between [0, 50]
+		}
+
+		m_lastMousePos.x = x;
+		m_lastMousePos.y = y;
+		return true;
+	}
+
+	return WindowApplication::ProcessMessage(msg);
+}
+
 void DxApplication::Update()
 {
-	XMStoreFloat4x4(&m_modelMtx, XMLoadFloat4x4(&m_modelMtx) *
-		XMMatrixRotationX(0.003f));
-	D3D11_MAPPED_SUBRESOURCE res;
-	m_device.context()-> Map(m_cbMVP.get(), 0,
-	 D3D11_MAP_WRITE_DISCARD, 0, &res);
-	XMMATRIX mvp = XMLoadFloat4x4(&m_modelMtx) *
-	 XMLoadFloat4x4(&m_viewMtx) * XMLoadFloat4x4(&m_projMtx);
-	memcpy(res.pData, &mvp, sizeof(XMMATRIX));
-	m_device.context()-> Unmap(m_cbMVP.get(), 0);
+	// Oblicz macierz widoku na podstawie kąta nachylenia i odległości
+	XMMATRIX camRotationX = XMMatrixRotationX(m_cameraAngle);
+	XMMATRIX translationZ = XMMatrixTranslation(0.0f, 0.0f, m_cameraDistance);
 
+	XMStoreFloat4x4(&m_viewMtx, camRotationX * translationZ);
+
+	XMMATRIX rotationMatrix = XMMatrixRotationY(rotationX);
+	XMMATRIX modelMatrix = XMMatrixIdentity();
+	XMStoreFloat4x4(&m_modelMtx, modelMatrix * rotationMatrix);
+
+	XMMATRIX moved = XMMatrixTranslation(-5.f, 0, 0);
+	XMStoreFloat4x4(&m_modelMtx2, modelMatrix * moved);
+
+	// Mapowanie stałej buforowej
+	D3D11_MAPPED_SUBRESOURCE res;
+	m_device.context()->Map(m_cbMVP.get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &res);
+
+	XMMATRIX mvp = XMLoadFloat4x4(&m_modelMtx) *
+		XMLoadFloat4x4(&m_viewMtx) *
+		XMLoadFloat4x4(&m_projMtx);
+
+	memcpy(res.pData, &mvp, sizeof(XMMATRIX));
+	m_device.context()->Unmap(m_cbMVP.get(), 0);
 }
+
 
 std::vector<DirectX::XMFLOAT2> DxApplication::CreateTriangleVertices()
 {
@@ -168,6 +248,11 @@ std::vector<unsigned short> DxApplication::CreateCubeIndices()
 	};
 }
 
+void DxApplication::Tick(float deltaSeconds)
+{
+	rotationX += rotationDeltaPerSecond * deltaSeconds;
+}
+
 void DxApplication::Render()
 {
 	float clearColor[] = { 0.5f, 0.5f, 1.0f, 1.0f };
@@ -193,6 +278,20 @@ void DxApplication::Render()
 		0, 1, vbs, strides, offsets);
 	m_device.context()->IASetIndexBuffer(m_indexBuffer.get(),
 		DXGI_FORMAT_R16_UINT, 0);
+	
+	// Render first cube
+	D3D11_MAPPED_SUBRESOURCE res;
+	m_device.context()->Map(m_cbMVP.get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &res);
+	XMMATRIX mvp1 = XMLoadFloat4x4(&m_modelMtx) * XMLoadFloat4x4(&m_viewMtx) * XMLoadFloat4x4(&m_projMtx);
+	memcpy(res.pData, &mvp1, sizeof(XMMATRIX));
+	m_device.context()->Unmap(m_cbMVP.get(), 0);
+	m_device.context()->DrawIndexed(36, 0, 0);
+
+	// Render second cube
+	m_device.context()->Map(m_cbMVP.get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &res);
+	XMMATRIX mvp2 = XMLoadFloat4x4(&m_modelMtx2) * XMLoadFloat4x4(&m_viewMtx) * XMLoadFloat4x4(&m_projMtx);
+	memcpy(res.pData, &mvp2, sizeof(XMMATRIX));
+	m_device.context()->Unmap(m_cbMVP.get(), 0);
 	m_device.context()->DrawIndexed(36, 0, 0);
 
 }
