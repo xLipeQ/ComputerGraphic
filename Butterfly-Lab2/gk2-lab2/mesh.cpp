@@ -109,7 +109,6 @@ std::vector<VertexPositionColor> mini::Mesh::ColoredBoxVerts(float width, float 
 }
 
 std::vector<VertexPositionNormal> mini::Mesh::ShadedBoxVerts(float width, float height, float depth)
-//TODO : 0.1. Create vertex list for box with normal vectors
 {
 	return {
 		//Front Face

@@ -14,14 +14,12 @@ cbuffer cbProj : register(b2) //Vertex Shader constant buffer slot 2 - matches s
 	matrix projMatrix;
 };
 
-//TODO : 0.4. Change vertex shader input structure to match new vertex type
 struct VSInput
 {
 	float3 pos : POSITION;
 	float3 nor : NORMAL; 
 };
 
-//TODO : 0.5. Change vertex shader output structure to store position, normal and view vectors in global coordinates
 struct PSInput
 {
 	float4 pos : SV_POSITION;
@@ -35,13 +33,10 @@ PSInput main(VSInput i)
 	float4 pos = mul(worldMatrix, float4(i.pos, 1.0f));
     o.worldPos = pos.xyz; // Store world position
 	
-	//TODO : 0.6. Store global (world) position in the output
 
 	pos = mul(viewMatrix, pos);
 	o.pos = mul(projMatrix, pos);
 
-	//TODO : 0.7. Calculate output normal and view vectors in global coordinates frame
-	//Hint: you can calculate camera position from inverted view matrix
     o.nor = mul(worldMatrix, float4(i.nor, 0.0f));
     o.cam_pos = mul(invViewMatrix, float4(0, 0, 0, 1));
 	

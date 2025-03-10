@@ -65,7 +65,6 @@ ButterflyDemo::ButterflyDemo(HINSTANCE hInstance)
 	m_vs = m_device.CreateVertexShader(vsCode);
 	m_ps = m_device.CreatePixelShader(psCode);
 
-	//TODO : 0.3. Change input layout to match new vertex structure
 	m_il = m_device.CreateInputLayout(VertexPositionNormal::Layout, vsCode);
 
 	//Billboard shaders
@@ -83,7 +82,6 @@ ButterflyDemo::ButterflyDemo(HINSTANCE hInstance)
 
 	//Meshes
 
-	//TODO : 0.2. Create a shaded box model instead of colored one 
 	m_box = Mesh::ShadedBox(m_device);
 
 	m_pentagon = Mesh::Pentagon(m_device);
@@ -140,6 +138,7 @@ void ButterflyDemo::CreateDodecahadronMtx()
 //Compute dodecahedronMtx and mirrorMtx
 {
 	//TODO : 1.01. calculate m_dodecahedronMtx matrices
+
 
 	//TODO : 1.12. calculate m_mirrorMtx matrices
 }
