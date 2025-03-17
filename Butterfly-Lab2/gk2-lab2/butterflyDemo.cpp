@@ -121,9 +121,9 @@ void ButterflyDemo::CreateRenderStates()
 
 	RasterizerDescription rsDesc;
 	//TODO : 1.13. Setup rasterizer state with ccw front faces
-
+	rsDesc.FrontCounterClockwise = true;
 	m_rsCCW = m_device.CreateRasterizerState(rsDesc);
-
+	
 	BlendDescription bsDesc;
 	//TODO : 1.26. Setup alpha blending state
 
@@ -162,7 +162,9 @@ void ButterflyDemo::CreateDodecahadronMtx()
 		XMStoreFloat4x4(&m_dodecahedronMtx[i], matrices[i]);
 	}
 
-	//TODO : 1.12. calculate m_mirrorMtx matrices
+	for (int i = 0; i < 12; i++) {
+		XMStoreFloat4x4(&m_mirrorMtx[i], XMMatrixInverse(nullptr, matrices[i]));
+	}
 }
 
 XMFLOAT3 ButterflyDemo::MoebiusStripPos(float t, float s)
@@ -274,7 +276,6 @@ void ButterflyDemo::UpdateCameraCB(DirectX::XMFLOAT4X4 cameraMtx)
 }
 
 void ButterflyDemo::UpdateButterfly(float dtime)
-//TODO : 1.10. Compute the matrices for butterfly wings. Position on the strip is determined based on time
 {
 	static float lap = 0.0f;
 	lap += dtime;
@@ -383,10 +384,12 @@ void ButterflyDemo::DrawDodecahedron(bool colors)
 	for (int i = 0; i < 12; i++) {
 		if (colors) 
 			UpdateBuffer(m_cbSurfaceColor, COLORS[i]);
+		if (!colors)
+			UpdateBuffer(m_cbSurfaceColor, XMFLOAT4(1.f,1.f,1.f,1.f));
+
 		UpdateBuffer(m_cbWorld, m_dodecahedronMtx[i]);
 		m_pentagon.Render(m_device.context());
 	}
-	//TODO : 1.14. Modify function so if colors parameter is set to false, all faces are drawn white instead
 }
 
 void ButterflyDemo::DrawMoebiusStrip()
@@ -396,7 +399,6 @@ void ButterflyDemo::DrawMoebiusStrip()
 }
 
 void ButterflyDemo::DrawButterfly()
-//TODO : 1.11. Draw the butterfly
 {
 	UpdateBuffer(m_cbWorld, m_wingMtx[0]);
 	m_wing.Render(m_device.context());
@@ -425,17 +427,39 @@ void ButterflyDemo::DrawMirroredWorld(unsigned int i)
 	//TODO : 1.24. Setup depth stencil state for rendering mirrored world
 
 	//TODO : 1.15. Setup rasterizer state and view matrix for rendering the mirrored world
+	XMMATRIX zMirror{
+		1, 0, 0, 0,
+		0, 1, 0, 0,
+		0, 0, -1, 0,
+		0, 0, 0, 1
+	};
+	XMFLOAT4X4 view;
+	XMStoreFloat4x4(&view,
+		XMLoadFloat4x4(&m_mirrorMtx[i]) * 
+		zMirror * 
+		XMLoadFloat4x4(&m_dodecahedronMtx[i]) *
+		m_camera.getViewMatrix()
+	);
+	UpdateCameraCB(view);
+	ID3D11RasterizerState* state;
+	m_device.context().get()->RSGetState(&state);
+	m_device.context().get()->RSSetState(m_rsCCW.get());
 
 	//TODO : 1.16. Draw 3D objects of the mirrored scene - dodecahedron should be drawn with only one light and no colors and without blending
+	DrawButterfly();
+	DrawDodecahedron(false);
+	DrawMoebiusStrip();
 
 	//TODO : 1.17. Restore rasterizer state to it's original value
+	m_device.context().get()->RSSetState(state);
 
 	//TODO : 1.37. Setup depth stencil state for rendering mirrored billboards
 	
 	//TODO : 1.38. Draw mirrored billboards - they need to be drawn after restoring rasterizer state, but with mirrored view matrix
 
 	//TODO : 1.18. Restore view matrix to its original value
-
+	XMStoreFloat4x4(&view, m_camera.getViewMatrix());
+	UpdateCameraCB(view);
 	//TODO : 1.25. Restore depth stencil state to it's original value
 }
 
@@ -451,7 +475,7 @@ void ButterflyDemo::Render()
 	m_device.context()->OMSetBlendState(m_bsAlpha.get(), nullptr, BS_MASK);
 	Set1Light();
 	//TODO : 1.19. Comment the following line for now
-	DrawDodecahedron(true);
+	//DrawDodecahedron(true);
 	//TODO : 1.27. Uncomment the above line again
 	m_device.context()->OMSetBlendState(nullptr, nullptr, BS_MASK);
 
