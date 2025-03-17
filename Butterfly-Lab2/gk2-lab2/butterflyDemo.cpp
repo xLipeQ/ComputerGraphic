@@ -137,7 +137,6 @@ void ButterflyDemo::CreateRenderStates()
 void ButterflyDemo::CreateDodecahadronMtx()
 //Compute dodecahedronMtx and mirrorMtx
 {
-	//TODO : 1.01. calculate m_dodecahedronMtx matrices
 	std::vector<DirectX::XMMATRIX> matrices(12);
 
 	matrices[0] = XMMatrixIdentity() *
@@ -169,25 +168,86 @@ void ButterflyDemo::CreateDodecahadronMtx()
 XMFLOAT3 ButterflyDemo::MoebiusStripPos(float t, float s)
 //TODO : 1.04. Compute the position of point on the Moebius strip for parameters t and s
 {
-	return {};
+	return XMFLOAT3(
+		cos(t) * (MOEBIUS_R + MOEBIUS_W * s * cos(0.5f * t)),
+		sin(t) * (MOEBIUS_R + MOEBIUS_W * s * cos(0.5f * t)),
+		MOEBIUS_W * s * sin(0.5f * t)
+	);
 }
 
 XMVECTOR ButterflyDemo::MoebiusStripDs(float t, float s)
-//TODO : 1.05. Return the s-derivative of point on the Moebius strip for parameters t and s
 {
-	return {};
+	return XMVectorSet(
+		cos(t) * cos(t / 2),
+		sin(t) * cos(t / 2),
+		sin(t / 2),
+		0.0f
+	);
 }
 
 XMVECTOR ButterflyDemo::MoebiusStripDt(float t, float s)
-//TODO : 1.06. Compute the t-derivative of point on the Moebius strip for parameters t and s
 {
-	return {};
+	float dx = -MOEBIUS_R * sin(t) - 0.5f * s * MOEBIUS_W * sin(0.5f * t) * cos(t) - MOEBIUS_W * s * cos(0.5f * t) * sin(t);
+	float dy = MOEBIUS_R * cos(t) - 0.5f * s * MOEBIUS_W * sin(0.5f * t) * sin(t) + MOEBIUS_W * s * cos(0.5f * t) * cos(t);
+	float dz = 0.5f * s * MOEBIUS_W * cos(0.5f * t);
+
+	return XMVectorSet(dx, dy, dz, 0.0f);
 }
 
 void ButterflyDemo::CreateMoebuisStrip()
 //TODO : 1.07. Create Moebius strip mesh
 {
-	
+	std::vector<unsigned short> indices;
+	std::vector<VertexPositionNormal> vertexBuffers;
+
+	// Genereting vertices and normals - for every t we have to points -s and +s
+	// We get its position and normal by derivative
+	for (unsigned int i = 0; i <= MOEBIUS_N; ++i)
+	{
+		float t = 4.0f * XM_PI * i / MOEBIUS_N;
+
+		for (int j = -1; j <= 1; j += 2) 
+		{
+			float s = static_cast<float>(j);
+
+			// Pozycja
+			VertexPositionNormal v;
+			v.position = MoebiusStripPos(t, s);
+
+			// Wektory styczne
+			XMVECTOR ds = MoebiusStripDs(t, s);
+			XMVECTOR dt = MoebiusStripDt(t, s);
+
+			// Normalna - iloczyn wektorowy ds x dt
+			XMVECTOR normal = XMVector3Normalize(XMVector3Cross(ds, dt));
+			XMFLOAT3 normalFloat3;
+			XMStoreFloat3(&normalFloat3, normal);
+			v.normal = normalFloat3;
+			vertexBuffers.push_back(v);
+		}
+	}
+
+	// Generating indices
+	for (unsigned int i = 1; i <= MOEBIUS_N; ++i)
+	{
+		unsigned int i0 = (i - 1) * 2;
+		unsigned int i1 = (i - 1) * 2 + 1;
+		unsigned int i2 = i * 2;
+		unsigned int i3 = i * 2 + 1;
+
+		indices.push_back(i0);
+		indices.push_back(i1);
+		indices.push_back(i2);
+
+		indices.push_back(i1);
+		indices.push_back(i3);
+		indices.push_back(i2);
+	}
+
+	// Tworzenie buforów Direct3D
+	m_moebius = Mesh::SimpleTriMesh(m_device, vertexBuffers, indices);
+
+
 }
 #pragma endregion
 
@@ -298,7 +358,6 @@ void ButterflyDemo::DrawBox()
 void ButterflyDemo::DrawDodecahedron(bool colors)
 //Draw dodecahedron. If color is true, use render faces with corresponding colors. Otherwise render using white color
 {
-	//TODO : 1.02. Draw all dodecahedron sides with colors - ignore function parameter for now
 	for (int i = 0; i < 12; i++) {
 		UpdateBuffer(m_cbWorld, m_dodecahedronMtx[i]);
 		m_pentagon.Render(m_device.context());
@@ -309,9 +368,9 @@ void ButterflyDemo::DrawDodecahedron(bool colors)
 }
 
 void ButterflyDemo::DrawMoebiusStrip()
-//TODO : 1.08. Draw the Moebius strip mesh
 {
-	
+	UpdateBuffer(m_cbWorld, XMMatrixIdentity());
+	m_moebius.Render(m_device.context());
 }
 
 void ButterflyDemo::DrawButterfly()
@@ -374,8 +433,7 @@ void ButterflyDemo::Render()
 	//render the rest of the scene with all lights
 	Set3Lights();
 	UpdateBuffer(m_cbSurfaceColor, XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
-	//TODO : 1.03. [optional] Comment the following line
-	DrawBox();
+	//DrawBox();
 	DrawMoebiusStrip();
 	DrawButterfly();
 	m_device.context()->OMSetDepthStencilState(m_dssNoDepthWrite.get(), 0);
