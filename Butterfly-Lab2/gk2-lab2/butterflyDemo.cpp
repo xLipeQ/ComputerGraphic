@@ -85,7 +85,7 @@ ButterflyDemo::ButterflyDemo(HINSTANCE hInstance)
 	m_box = Mesh::ShadedBox(m_device);
 
 	m_pentagon = Mesh::Pentagon(m_device);
-	m_wing = Mesh::DoubleRect(m_device, 2.0f);
+	m_wing = Mesh::DoubleRect(m_device, WING_W, WING_H);
 	CreateMoebuisStrip();
 
 	m_bilboard = Mesh::Billboard(m_device, 2.0f);
@@ -166,7 +166,6 @@ void ButterflyDemo::CreateDodecahadronMtx()
 }
 
 XMFLOAT3 ButterflyDemo::MoebiusStripPos(float t, float s)
-//TODO : 1.04. Compute the position of point on the Moebius strip for parameters t and s
 {
 	return XMFLOAT3(
 		cos(t) * (MOEBIUS_R + MOEBIUS_W * s * cos(0.5f * t)),
@@ -195,7 +194,6 @@ XMVECTOR ButterflyDemo::MoebiusStripDt(float t, float s)
 }
 
 void ButterflyDemo::CreateMoebuisStrip()
-//TODO : 1.07. Create Moebius strip mesh
 {
 	std::vector<unsigned short> indices;
 	std::vector<VertexPositionNormal> vertexBuffers;
@@ -289,8 +287,33 @@ void ButterflyDemo::UpdateButterfly(float dtime)
 	t *= XM_2PI;
 	if (a > WING_MAX_A)
 		a = 2 * WING_MAX_A - a;
+
+	DirectX::XMFLOAT3 P = MoebiusStripPos(t, 0);
+	auto Pt = XMVector3Normalize(MoebiusStripDt(t, 0));
+	auto Ps = XMVector3Normalize(MoebiusStripDs(t, 0));
+	auto PtPs = XMVector3Normalize(DirectX::XMVector3Cross(Ps, Pt));
+
+	DirectX::XMMATRIX moebius;
+	moebius.r[0] = DirectX::XMVectorSetW(Pt, 0.0f); 
+	moebius.r[1] = DirectX::XMVectorSetW(PtPs, 0.0f); 
+	moebius.r[2] = DirectX::XMVectorSetW(Ps, 0.0f);
+	moebius.r[3] = DirectX::XMVectorSetW(XMLoadFloat3(&P), 1.0f); 
+
 	//Write the rest of code here
-	
+	XMStoreFloat4x4(&m_wingMtx[0],
+		XMMatrixTranslation(0.f, +WING_H / 2.f, 0.f) *
+		XMMatrixRotationY(XM_PI / 2) *
+		XMMatrixRotationZ(a) *
+		XMMatrixRotationY(XM_PI / 2) *
+		moebius
+	);
+	XMStoreFloat4x4(&m_wingMtx[1], 
+		XMMatrixTranslation(0.f, +WING_H / 2.f, 0.f) *
+		XMMatrixRotationY(XM_PI / 2) *
+		XMMatrixRotationZ(-a) *
+		XMMatrixRotationY(XM_PI / 2) *
+		moebius
+	);
 }
 #pragma endregion
 
@@ -356,15 +379,14 @@ void ButterflyDemo::DrawBox()
 }
 
 void ButterflyDemo::DrawDodecahedron(bool colors)
-//Draw dodecahedron. If color is true, use render faces with corresponding colors. Otherwise render using white color
 {
 	for (int i = 0; i < 12; i++) {
+		if (colors) 
+			UpdateBuffer(m_cbSurfaceColor, COLORS[i]);
 		UpdateBuffer(m_cbWorld, m_dodecahedronMtx[i]);
 		m_pentagon.Render(m_device.context());
 	}
-
 	//TODO : 1.14. Modify function so if colors parameter is set to false, all faces are drawn white instead
-	
 }
 
 void ButterflyDemo::DrawMoebiusStrip()
@@ -376,7 +398,10 @@ void ButterflyDemo::DrawMoebiusStrip()
 void ButterflyDemo::DrawButterfly()
 //TODO : 1.11. Draw the butterfly
 {
-	
+	UpdateBuffer(m_cbWorld, m_wingMtx[0]);
+	m_wing.Render(m_device.context());
+	UpdateBuffer(m_cbWorld, m_wingMtx[1]);
+	m_wing.Render(m_device.context());
 }
 
 void ButterflyDemo::DrawBillboards()
@@ -433,7 +458,6 @@ void ButterflyDemo::Render()
 	//render the rest of the scene with all lights
 	Set3Lights();
 	UpdateBuffer(m_cbSurfaceColor, XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
-	//DrawBox();
 	DrawMoebiusStrip();
 	DrawButterfly();
 	m_device.context()->OMSetDepthStencilState(m_dssNoDepthWrite.get(), 0);

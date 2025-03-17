@@ -51,5 +51,5 @@ float4 main(PSInput input) : SV_TARGET
         specular += lighting.lights[i].color * lighting.surface.b * RdotV;
     }
 
-    return ambient + diffuse ;
+    return ambient + diffuse + specular;
 }
