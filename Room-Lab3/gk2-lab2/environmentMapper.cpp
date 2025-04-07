@@ -123,6 +123,7 @@ void EnvironmentMapper::SetTarget(const dx_ptr<ID3D11DeviceContext>& context)
 
 	// TODO : 1.18 Setup viewport
 	viewport.TopLeftX = viewport.TopLeftY = 0;
+	viewport.Width = viewport.Height = TEXTURE_SIZE;
 	viewport.MinDepth = 0;
 	viewport.MaxDepth = 1;
 

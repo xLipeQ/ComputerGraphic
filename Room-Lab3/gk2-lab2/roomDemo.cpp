@@ -355,8 +355,8 @@ void RoomDemo::DrawTeapot()
 	SetSurfaceColor(XMFLOAT4(0.8f, 0.7f, 0.65f, 1.0f));
 
 	// TODO : 1.26 [optional] Comment the following line and uncomment the next to replace teapot with a sphere
-	//DrawMesh(m_teapot, m_teapotMtx);
-	DrawMesh(m_sphere, m_sphereMtx);
+	DrawMesh(m_teapot, m_teapotMtx);
+	//DrawMesh(m_sphere, m_sphereMtx);
 
 	SetSurfaceColor(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
 }
