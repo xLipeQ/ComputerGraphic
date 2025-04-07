@@ -15,5 +15,5 @@ struct PSInput
 float4 main(PSInput i) : SV_TARGET
 {
 	// TODO : 1.24 Sample the color map and multiply it by the surface color
-	return surfaceColor;
+    return colorMap.Sample(colorSampler, i.tex) * surfaceColor;
 }
