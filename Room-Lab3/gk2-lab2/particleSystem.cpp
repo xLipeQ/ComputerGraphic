@@ -80,7 +80,8 @@ Particle ParticleSystem::RandomParticle()
 	p.Vertex.Angle = 0;
 	p.Vertex.Pos = m_emitterPos;
 	p.Vertex.Size = PARTICLE_SIZE;
-
+	p.Velocities.Velocity = RandomVelocity();
+	p.Velocities.AngularVelocity = anglularVelDist(m_random);
 	return p;
 }
 
@@ -92,11 +93,11 @@ void ParticleSystem::UpdateParticle(Particle& p, float dt)
 	XMVECTOR pos = XMLoadFloat3(&p.Vertex.Pos);
 	XMVECTOR vel = XMLoadFloat3(&p.Velocities.Velocity);
 
-	XMVECTOR newPos = XMVectorAdd(pos, XMVectorScale(vel, dt));
+	XMVECTOR newPos = XMVectorAdd(pos, vel * dt);
 	XMStoreFloat3(&p.Vertex.Pos, newPos);
 
 	p.Vertex.Angle += p.Velocities.AngularVelocity * dt;
-	p.Vertex.Size += PARTICLE_SIZE * PARTICLE_SIZE * dt;
+	p.Vertex.Size += PARTICLE_SIZE * PARTICLE_SCALE * dt;
 }
 
 vector<ParticleVertex> ParticleSystem::GetParticleVerts(DirectX::XMFLOAT4 cameraPosition)
@@ -109,19 +110,14 @@ vector<ParticleVertex> ParticleSystem::GetParticleVerts(DirectX::XMFLOAT4 camera
 		vertices.push_back(m_particles[i].Vertex);
 	}
 
-	std::sort(vertices.begin(), vertices.end(), [cameraPosition](const ParticleVertex& v1, const ParticleVertex&  v2) {
+	std::sort(vertices.begin(), vertices.end(), [&cameraPosition, &cameraTarget](const ParticleVertex& v1, const ParticleVertex&  v2) {
 		// Load vertex positions (XMFLOAT3) into XMVECTORs
 		XMVECTOR pos1 = XMLoadFloat3(&v1.Pos);
 		XMVECTOR pos2 = XMLoadFloat3(&v2.Pos);
 		// Load the camera position (XMFLOAT4) into an XMVECTOR
-		XMVECTOR camPos = XMLoadFloat4(&cameraPosition);
+		XMVECTOR camPos = XMLoadFloat4(&cameraPosition) - XMLoadFloat4(&cameraTarget);
 
-		// Compute squared distances: (pos - camPos)^2 (avoiding sqrt for performance)
-		float distSq1 = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(pos1, camPos)));
-		float distSq2 = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(pos2, camPos)));
-
-		// Sort in descending order (further vertices come first)
-		return distSq1 > distSq2;
+		return XMVector3Length(camPos - pos1).m128_f32[0] > XMVector3Length(camPos - pos2).m128_f32[0];
 	});
 
 	return vertices;

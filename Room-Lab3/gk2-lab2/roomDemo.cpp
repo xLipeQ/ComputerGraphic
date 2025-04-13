@@ -228,7 +228,7 @@ void RoomDemo::UpdateLamp(float dt)
 void mini::gk2::RoomDemo::UpdateParticles(float dt)
 {
 	// TODO : 1.31 update particle system and copy vertex data to the buffer
-	UpdateBuffer(&m_vbParticles, m_particles.Update(dt, m_camera.getCameraPosition()));
+	UpdateBuffer(m_vbParticles, m_particles.Update(dt, m_camera.getCameraPosition()));
 }
 
 void RoomDemo::Update(const Clock& c)
