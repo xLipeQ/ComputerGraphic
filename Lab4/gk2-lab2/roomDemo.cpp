@@ -34,31 +34,42 @@ RoomDemo::RoomDemo(HINSTANCE appInstance)
 	UpdateCameraCB();
 
 	// TODO : 1.02 Calculate light projection matrix;
+	XMStoreFloat4x4(&m_lightProjMtx, XMMatrixPerspectiveFovLH(LIGHT_FOV_ANGLE, 1, LIGHT_NEAR, LIGHT_FAR));
 
 	//Sampler States
 	SamplerDescription sd;
 
 	// TODO : 1.05 Create sampler with appropriate border color and addressing (border) and filtering (bilinear) modes
-
+	sd.AddressU = sd.AddressV = sd.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
+	sd.BorderColor[0] = sd.BorderColor[1] = sd.BorderColor[2] = sd.BorderColor[3] = 0;
+	sd.Filter = D3D11_FILTER_COMPARISON_MIN_MAG_POINT_MIP_LINEAR;
 	m_sampler = m_device.CreateSamplerState(sd);
 
 	//Textures
 	// TODO : 1.10 Create shadow texture with appropriate width, height, format, mip levels and bind flags
 	Texture2DDescription td;
+	td.Width = td.Height = MAP_SIZE;
+	td.Format = DXGI_FORMAT_R32_TYPELESS;
+	td.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
+	td.MipLevels = 1;
 
-	//auto shadowTexture = m_device.CreateTexture(td);
+	auto shadowTexture = m_device.CreateTexture(td);
 
 	DepthStencilViewDescription dvd;
-
 	// TODO : 1.11 Create depth-stencil-view for the shadow texture with appropriate format
+	dvd.Format = DXGI_FORMAT_D32_FLOAT;
 
-	//m_shadowDepthBuffer = m_device.CreateDepthStencilView(shadowTexture, dvd);
+	m_shadowDepthBuffer = m_device.CreateDepthStencilView(shadowTexture, dvd);
 
 	ShaderResourceViewDescription srvd;
 
 	// TODO : 1.12 Create shader resource view for the shadow texture with appropriate format, view dimensions, mip levels and most detailed mip level
+	srvd.Format = DXGI_FORMAT_R32_FLOAT;
+	srvd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+	srvd.Texture2D.MipLevels = 1;
+	srvd.Texture2D.MostDetailedMip = 0;
 
-	//m_shadowMap = m_device.CreateShaderResourceView(shadowTexture, srvd);
+	m_shadowMap = m_device.CreateShaderResourceView(shadowTexture, srvd);
 
 	//Meshes
 	vector<VertexPositionNormal> vertices;
@@ -171,19 +182,32 @@ void RoomDemo::UpdateLamp(float dt)
 	XMFLOAT4 lightTarget{ 0.0f, -10.0f, 0.0f, 1.0f };
 	XMFLOAT4 upDir{ 1.0f, 0.0f, 0.0f, 0.0f };
 
+	XMVECTOR pos = XMLoadFloat4(&lightPos);
+	XMVECTOR target = XMLoadFloat4(&lightTarget);
+	XMVECTOR up = XMLoadFloat4(&upDir);
+
 	XMFLOAT4X4 texMtx;
 
 	// TODO : 1.04 Calculate new light position in world coordinates
-
-	UpdateBuffer(m_cbLightPos, lightPos);
+	UpdateBuffer(m_cbLightPos, XMVector3TransformCoord(pos, XMLoadFloat4x4(&m_lampMtx)));
 
 	// TODO : 1.01 Calculate light's view and inverted view matrix
+	XMStoreFloat4x4(&m_lightViewMtx[0], 
+		XMMatrixLookAtLH( 
+			XMVector3TransformCoord(pos, XMLoadFloat4x4(&m_lampMtx)), 
+			XMVector3TransformCoord(target, XMLoadFloat4x4(&m_lampMtx)), 
+			XMVector3TransformNormal(up, XMLoadFloat4x4(&m_lampMtx))));
+	XMStoreFloat4x4(&m_lightViewMtx[1], XMMatrixInverse(nullptr, XMLoadFloat4x4(&m_lightViewMtx[0])));
 
 	// TODO : 1.03 Calculate map transform matrix
+	XMStoreFloat4x4(&texMtx, XMLoadFloat4x4(&m_lightViewMtx[0])
+		* XMLoadFloat4x4(&m_lightProjMtx)
+		* XMMatrixScaling(0.5f, -0.5f, 1.0f)
+		* XMMatrixTranslation(0.5f, 0.5f, 0.0f));
 
 	// TODO : 1.19 Modify map transform to fix z-fighting
 
-	XMStoreFloat4x4(&texMtx, XMMatrixIdentity());
+	//XMStoreFloat4x4(&texMtx, XMMatrixIdentity());
 
 	UpdateBuffer(m_cbMapMtx, texMtx);
 
@@ -278,21 +302,33 @@ void RoomDemo::Render()
 	Base::Render();
 
 	// TODO : 1.13 Copy light's view/inverted view and projection matrix to constant buffers
+	UpdateBuffer(m_cbViewMtx, m_lightViewMtx);
+	UpdateBuffer(m_cbProjMtx, m_lightProjMtx);
 
 	// TODO : 1.14 Set up view port of the appropriate size
+	Viewport viewPort({MAP_SIZE, MAP_SIZE});
+	m_device.context().get()->RSSetViewports(1, &viewPort);
 
 	// TODO : 1.15 Bind no render targets and the shadow map as depth buffer
+	m_device.context().get()->OMSetRenderTargets(0, 0, m_shadowDepthBuffer.get());
 
 	// TODO : 1.16 Clear the depth buffer
+	m_device.context().get()->ClearDepthStencilView(m_shadowDepthBuffer.get(), D3D10_CLEAR_DEPTH, 1.f, 0);
 
 	// TODO : 1.17 Render objects and particles (w/o blending) to the shadow map using Phong shaders
+	SetShaders(m_phongVS, m_lightShadowPS);
+
+	DrawScene();
+	DrawParticles();
 
 	ResetRenderTarget();
 	UpdateBuffer(m_cbProjMtx, m_projMtx);
 	UpdateCameraCB();
 
 	// TODO : 1.08 Bind m_lightMap and m_shadowMap textures then draw objects and particles using light&shadow pixel shader
-	SetShaders(m_phongVS, m_phongPS);
+	SetTextures({ m_lightMap.get(), m_shadowMap.get()});
+
+	SetShaders(m_phongVS, m_lightShadowPS);
 
 	DrawScene();
 
